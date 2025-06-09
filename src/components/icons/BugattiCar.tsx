@@ -20,8 +20,7 @@ export function BugattiCar({ color = 'blue', direction = 'up', ...props }: CarPr
       viewBox="0 0 40 70" 
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"
-      transform-origin="center center"
-      style={{ transform: `rotate(${rotation}deg)`}}
+      style={{ transform: `rotate(${rotation}deg)`, transformOrigin: 'center center' }}
       {...props}
     >
       <path d="M10 65C10 67.7614 12.2386 70 15 70C17.7614 70 20 67.7614 20 65C20 62.2386 17.7614 60 15 60C12.2386 60 10 62.2386 10 65Z" fill="black"/>

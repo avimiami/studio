@@ -19,8 +19,7 @@ export function ChevyCar({ color = '#555555', direction = 'up', ...props }: CarP
       viewBox="0 0 40 70" 
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"
-      transform-origin="center center"
-      style={{ transform: `rotate(${rotation}deg)`}}
+      style={{ transform: `rotate(${rotation}deg)`, transformOrigin: 'center center' }}
       {...props}
     >
       {/* Wheels */}
