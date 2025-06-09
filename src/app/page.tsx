@@ -18,7 +18,7 @@ export default function HomePage() {
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-6 bg-gradient-to-br from-background to-secondary">
       <header className="mb-10 text-center">
-        <h1 className="text-6xl font-headline text-primary drop-shadow-lg">Velocity Chaser</h1>
+        <h1 className="text-6xl font-headline text-primary drop-shadow-lg">Ariel's Car Chaser Game</h1>
         <p className="mt-2 text-xl text-foreground/80 font-body">Select your car and hit the track!</p>
       </header>
       
