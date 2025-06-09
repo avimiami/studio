@@ -101,11 +101,30 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       direction: 'up',
     });
 
+    const obstacleEffectiveWidth = TRACK_WIDTH * 0.35; 
+    const trackMargin = TRACK_WIDTH * 0.05;
+
+    const leftPlacementMaxRandomRange = (TRACK_WIDTH / 2) - obstacleEffectiveWidth - (2 * trackMargin);
+    const rightPlacementMaxRandomRange = (TRACK_WIDTH / 2) - obstacleEffectiveWidth - (2 * trackMargin);
+    
+    let tunnelX, bridgeX;
+
+    if (currentLevel % 2 === 1) { 
+      tunnelX = trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange);
+      bridgeX = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, rightPlacementMaxRandomRange);
+    } else { 
+      tunnelX = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, rightPlacementMaxRandomRange);
+      bridgeX = trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange);
+    }
+    
+    const actualTunnelWidth = TRACK_WIDTH * 0.35;
+    const actualBridgeWidth = TRACK_WIDTH * 0.35;
+
     setObstacles([
-      { id: 'tunnel', x: TRACK_WIDTH * 0.05, y: TRACK_HEIGHT * 0.25, width: TRACK_WIDTH * 0.4, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' },
-      { id: 'bridge', x: TRACK_WIDTH * 0.55, y: TRACK_HEIGHT * 0.55, width: TRACK_WIDTH * 0.4, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up'},
-      { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'}, // Slightly adjusted wall
-      { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'}, // Slightly adjusted wall
+      { id: 'tunnel', x: tunnelX, y: TRACK_HEIGHT * 0.25, width: actualTunnelWidth, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' as Direction },
+      { id: 'bridge', x: bridgeX, y: TRACK_HEIGHT * 0.55, width: actualBridgeWidth, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up' as Direction},
+      { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
+      { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
     ]);
     
     setIsGameOver(false);
@@ -323,4 +342,5 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   );
 }
 
+    
     
