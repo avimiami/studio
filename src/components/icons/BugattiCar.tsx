@@ -1,3 +1,4 @@
+
 import type { SVGProps } from 'react';
 
 interface CarProps extends SVGProps<SVGSVGElement> {
@@ -14,25 +15,45 @@ export function BugattiCar({ color = 'blue', direction = 'up', ...props }: CarPr
   }[direction];
 
   return (
-    <svg 
-      width="40" 
-      height="70" 
-      viewBox="0 0 40 70" 
-      fill="none" 
+    <svg
+      width="40"
+      height="70"
+      viewBox="0 0 50 90" // Adjusted viewBox for a slightly different aspect ratio
+      fill="none"
       xmlns="http://www.w3.org/2000/svg"
       style={{ transform: `rotate(${rotation}deg)`, transformOrigin: 'center center' }}
       {...props}
     >
-      <path d="M10 65C10 67.7614 12.2386 70 15 70C17.7614 70 20 67.7614 20 65C20 62.2386 17.7614 60 15 60C12.2386 60 10 62.2386 10 65Z" fill="black"/>
-      <path d="M20 65C20 67.7614 22.2386 70 25 70C27.7614 70 30 67.7614 30 65C30 62.2386 27.7614 60 25 60C22.2386 60 20 62.2386 20 65Z" fill="black"/>
-      <path d="M5 20C5 14.4772 9.47715 10 15 10H25C30.5228 10 35 14.4772 35 20V50H5V20Z" fill={color} stroke="black" strokeWidth="2"/>
-      <rect x="10" y="0" width="20" height="15" rx="5" fill={color} stroke="black" strokeWidth="2"/>
-      <path d="M5 50H35L30 60H10L5 50Z" fill={color} stroke="black" strokeWidth="2"/>
-      {/* Headlights */}
-      <rect x="7" y="12" width="5" height="8" rx="2" fill="yellow" stroke="black" strokeWidth="1"/>
-      <rect x="28" y="12" width="5" height="8" rx="2" fill="yellow" stroke="black" strokeWidth="1"/>
-       {/* Windshield */}
-      <path d="M10 2C10 0.895431 10.8954 0 12 0H28C29.1046 0 30 0.895431 30 2V10H10V2Z" fill="lightblue" stroke="black" strokeWidth="1.5"/>
+      {/* Main Body - more streamlined */}
+      <path d="M10 85 C5 80, 5 20, 10 10 H40 C45 20, 45 80, 40 85 Z" fill={color} stroke="black" strokeWidth="2" />
+
+      {/* Cabin/Roof - more aggressive slope */}
+      <path d="M15 45 C15 35, 20 25, 25 25 H25 C30 25, 35 35, 35 45 L38 55 H12 L15 45 Z" fill="#AAAAFF" stroke="black" strokeWidth="2" />
+      
+      {/* Windshield */}
+      <path d="M18 27 H32 L30 40 H20 L18 27 Z" fill="lightblue" stroke="black" strokeWidth="1.5" />
+
+      {/* C-line signature (simplified) */}
+      <path d="M38 70 Q42 50, 38 30" stroke="black" strokeWidth="2.5" fill="none" />
+      <path d="M12 70 Q8 50, 12 30" stroke="black" strokeWidth="2.5" fill="none" />
+      
+      {/* Headlights (quad LED style) */}
+      <rect x="12" y="12" width="4" height="6" rx="1" fill="yellow" stroke="black" strokeWidth="1"/>
+      <rect x="17" y="12" width="4" height="6" rx="1" fill="yellow" stroke="black" strokeWidth="1"/>
+      <rect x="29" y="12" width="4" height="6" rx="1" fill="yellow" stroke="black" strokeWidth="1"/>
+      <rect x="34" y="12" width="4" height="6" rx="1" fill="yellow" stroke="black" strokeWidth="1"/>
+
+      {/* Hint of front grille (horseshoe) */}
+      <path d="M22 10 C20 12, 20 18, 22 20 H28 C30 18, 30 12, 28 10 Z" fill="#555555" stroke="black" strokeWidth="1" />
+      
+      {/* Rear spoiler indication */}
+      <rect x="12" y="82" width="26" height="4" rx="1" fill={color} stroke="black" strokeWidth="1.5" />
+
+      {/* Wheels (implied, covered by body from top-down) - kept simple */}
+      <ellipse cx="10" cy="75" rx="4" ry="7" fill="#333333" />
+      <ellipse cx="40" cy="75" rx="4" ry="7" fill="#333333" />
+      <ellipse cx="10" cy="25" rx="4" ry="7" fill="#333333" />
+      <ellipse cx="40" cy="25" rx="4" ry="7" fill="#333333" />
     </svg>
   );
 }

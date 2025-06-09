@@ -1,3 +1,4 @@
+
 export type CarColor = 'blue' | 'yellow' | 'pink' | 'red';
 
 export const CAR_COLORS: Record<CarColor, string> = {
@@ -17,4 +18,7 @@ export interface GameObject {
   height: number;
   direction: Direction;
   color: string;
+  isObstacle?: boolean;
+  isFinishLine?: boolean;
+  label?: string; // For displaying text on obstacles/finish line
 }

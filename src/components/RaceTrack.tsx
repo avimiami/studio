@@ -1,13 +1,14 @@
+
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { CarColor, Direction, GameObject } from '@/lib/types';
 import { CAR_COLORS } from '@/lib/types';
 import { BugattiCar } from '@/components/icons/BugattiCar';
 import { ChevyCar } from '@/components/icons/ChevyCar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag } from 'lucide-react'; // Added Flag icon
 
 interface RaceTrackProps {
   playerCarColorName: CarColor;
@@ -16,56 +17,54 @@ interface RaceTrackProps {
 const TRACK_WIDTH = 800;
 const TRACK_HEIGHT = 600;
 const CAR_WIDTH = 40;
-const CAR_HEIGHT = 70;
-const MOVE_STEP = 20; // Increased step for noticeable movement
+const CAR_HEIGHT = 70; // Bugatti height is 90 based on new SVG, but keep hit box smaller
+const PLAYER_CAR_EFFECTIVE_HEIGHT = 70; // For consistent collision
+const MOVE_STEP = 20;
 const NUM_PACE_CARS = 3;
-const PACE_CAR_SPEED = 2; // Slower speed for pace cars
+const INITIAL_PACE_CAR_SPEED = 2;
+const PACE_CAR_SPEED_INCREMENT = 0.5;
+const FINISH_LINE_HEIGHT = 40;
 
 export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const playerCarColor = CAR_COLORS[playerCarColorName];
-  const [score, setScore] = useState(0);
-  const gameTimeRef = useRef<NodeJS.Timeout | null>(null);
+  const [score, setScore] = useState(0); // Points for reaching finish line
+  const [level, setLevel] = useState(1);
+  const [paceCarSpeed, setPaceCarSpeed] = useState(INITIAL_PACE_CAR_SPEED);
+  
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
-  const initialPlayerCarState = {
+  const initialPlayerCarState = useMemo(() => ({
     id: 'player',
     x: TRACK_WIDTH / 2 - CAR_WIDTH / 2,
-    y: TRACK_HEIGHT - CAR_HEIGHT - 20,
+    y: TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT - 20,
     width: CAR_WIDTH,
-    height: CAR_HEIGHT,
+    height: PLAYER_CAR_EFFECTIVE_HEIGHT,
     direction: 'up' as Direction,
     color: playerCarColor,
-  };
+  }), [playerCarColor]);
+
   const [playerCar, setPlayerCar] = useState<GameObject>(initialPlayerCarState);
 
   const createPaceCar = (id: number): GameObject => ({
     id: `pace-${id}`,
     x: Math.random() * (TRACK_WIDTH - CAR_WIDTH),
-    y: Math.random() * (TRACK_HEIGHT / 2), // Start in upper half
+    y: Math.random() * (TRACK_HEIGHT / 2) + FINISH_LINE_HEIGHT + 20, // Start below finish line & obstacles
     width: CAR_WIDTH,
     height: CAR_HEIGHT,
     direction: 'down' as Direction,
-    color: '#555555', // Default Chevy color
+    color: '#555555',
   });
 
   const [paceCars, setPaceCars] = useState<GameObject[]>(() =>
     Array.from({ length: NUM_PACE_CARS }, (_, i) => createPaceCar(i))
   );
   
+  const [obstacles, setObstacles] = useState<GameObject[]>([]);
+  const [finishLine, setFinishLine] = useState<GameObject | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
 
-  const resetGame = useCallback(() => {
-    setPlayerCar(initialPlayerCarState);
-    setPaceCars(Array.from({ length: NUM_PACE_CARS }, (_, i) => createPaceCar(i)));
-    setScore(0);
-    setIsGameOver(false);
-  }, [playerCarColorName]);
-
-
   const checkCollision = useCallback((car1: GameObject, car2: GameObject): boolean => {
-    // Simple AABB collision detection
-    // Adjust collision box to be slightly smaller than visual representation for more forgiving gameplay
-    const collisionPadding = 10; // pixels
+    const collisionPadding = 5; // Reduced padding for tighter obstacle interaction
     return (
       car1.x < car2.x + car2.width - collisionPadding &&
       car1.x + car1.width - collisionPadding > car2.x &&
@@ -74,20 +73,66 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     );
   }, []);
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+  const resetGame = useCallback((isNewLevelStart = false) => {
+    let currentLevel = level;
+    if (isNewLevelStart) {
+      currentLevel = level + 1;
+      setLevel(currentLevel);
+      setScore((s) => s + 1);
+    } else {
+      // Full game over reset or initial load
+      currentLevel = 1;
+      setLevel(1);
+      setScore(0);
+    }
+
+    setPlayerCar(initialPlayerCarState);
+    setPaceCars(Array.from({ length: NUM_PACE_CARS }, (_, i) => createPaceCar(i)));
+    setPaceCarSpeed(INITIAL_PACE_CAR_SPEED + (currentLevel - 1) * PACE_CAR_SPEED_INCREMENT);
+
+    setFinishLine({
+      id: 'finish',
+      x: 0,
+      y: 0,
+      width: TRACK_WIDTH,
+      height: FINISH_LINE_HEIGHT,
+      color: 'hsl(var(--primary))', 
+      isFinishLine: true,
+      label: 'FINISH',
+      direction: 'up',
+    });
+
+    setObstacles([
+      { id: 'tunnel', x: TRACK_WIDTH * 0.1, y: TRACK_HEIGHT * 0.25, width: TRACK_WIDTH * 0.8, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' },
+      { id: 'bridge', x: TRACK_WIDTH * 0.3, y: TRACK_HEIGHT * 0.55, width: TRACK_WIDTH * 0.4, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up'},
+      { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.2, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'},
+      { id: 'wall-right', x: TRACK_WIDTH * 0.8, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.2, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'},
+    ]);
+    
+    setIsGameOver(false);
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+  }, [level, initialPlayerCarState]);
+
+
+  useEffect(() => {
+    resetGame(); // Initial setup
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPlayerCarState]); // Only on initialPlayerCarState change (which is stable after mount)
+
+  const handlePlayerMove = useCallback((key: string) => {
     if (isGameOver) return;
     setPlayerCar((prev) => {
       let newX = prev.x;
       let newY = prev.y;
       let newDirection = prev.direction;
 
-      switch (event.key) {
+      switch (key) {
         case 'ArrowUp':
           newY = Math.max(0, prev.y - MOVE_STEP);
           newDirection = 'up';
           break;
         case 'ArrowDown':
-          newY = Math.min(TRACK_HEIGHT - CAR_HEIGHT, prev.y + MOVE_STEP);
+          newY = Math.min(TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT, prev.y + MOVE_STEP);
           newDirection = 'down';
           break;
         case 'ArrowLeft':
@@ -101,31 +146,35 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
         default:
           return prev;
       }
-      return { ...prev, x: newX, y: newY, direction: newDirection };
+
+      const proposedCar = { ...prev, x: newX, y: newY, direction: newDirection };
+
+      for (const obs of obstacles) {
+        if (checkCollision(proposedCar, obs)) {
+          return prev; 
+        }
+      }
+      return proposedCar;
     });
-  }, [isGameOver]);
+  }, [isGameOver, obstacles, checkCollision]);
+
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
+    const onKeyDown = (event: KeyboardEvent) => handlePlayerMove(event.key);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', onKeyDown);
     };
-  }, [handleKeyDown]);
+  }, [handlePlayerMove]);
+
 
   useEffect(() => {
     if (isGameOver) {
-      if (gameTimeRef.current) clearInterval(gameTimeRef.current);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       return;
     }
-
-    gameTimeRef.current = setInterval(() => {
-      setScore((s) => s + 1);
-    }, 1000);
     
-    // Game loop for pace car movement and collision detection
     gameLoopRef.current = setInterval(() => {
-      // Pace car logic
       setPaceCars(prevPaceCars => 
         prevPaceCars.map(pc => {
           let newX = pc.x;
@@ -136,64 +185,102 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
           const dy = playerCar.y - pc.y;
 
           if (Math.abs(dx) > Math.abs(dy)) {
-            if (dx > 0) { newX += PACE_CAR_SPEED; newDirection = 'right'; }
-            else { newX -= PACE_CAR_SPEED; newDirection = 'left'; }
+            if (dx > 0) { newX += paceCarSpeed; newDirection = 'right'; }
+            else { newX -= paceCarSpeed; newDirection = 'left'; }
           } else {
-            if (dy > 0) { newY += PACE_CAR_SPEED; newDirection = 'down'; }
-            else { newY -= PACE_CAR_SPEED; newDirection = 'up'; }
+            if (dy > 0) { newY += paceCarSpeed; newDirection = 'down'; }
+            else { newY -= paceCarSpeed; newDirection = 'up'; }
           }
           
-          // Keep pace cars within bounds
           newX = Math.max(0, Math.min(TRACK_WIDTH - CAR_WIDTH, newX));
-          newY = Math.max(0, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY));
+          newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY)); // Keep pace cars below finish line
 
           return { ...pc, x: newX, y: newY, direction: newDirection };
         })
       );
 
-      // Collision detection
       for (const pc of paceCars) {
         if (checkCollision(playerCar, pc)) {
           setIsGameOver(true);
           break; 
         }
       }
-    }, 50); // Game loop runs every 50ms
+      
+      if (finishLine && checkCollision(playerCar, finishLine)) {
+        resetGame(true); // true for new level
+      }
+
+    }, 50);
 
     return () => {
-      if (gameTimeRef.current) clearInterval(gameTimeRef.current);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
-  }, [playerCar, paceCars, checkCollision, isGameOver]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerCar, paceCars, checkCollision, isGameOver, finishLine, paceCarSpeed, resetGame]);
 
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-4">
-      <ScoreDisplay score={score} />
+      <ScoreDisplay score={score} level={level} />
       <div 
-        className="relative bg-muted border-4 border-primary rounded-lg shadow-2xl overflow-hidden"
+        className="relative bg-muted/70 border-4 border-primary rounded-lg shadow-2xl overflow-hidden"
         style={{ width: TRACK_WIDTH, height: TRACK_HEIGHT }}
         role="img"
         aria-label="Race Track Area"
-        data-ai-hint="race track aerial"
+        data-ai-hint="race track obstacles"
       >
-        <img src={`https://placehold.co/${TRACK_WIDTH}x${TRACK_HEIGHT}.png/CCCCCC/333333?text=Track`} alt="Race Track Background" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+        <img src={`https://placehold.co/${TRACK_WIDTH}x${TRACK_HEIGHT}.png/EEEEEE/333333?text=Track`} alt="Race Track Background" className="absolute inset-0 w-full h-full object-cover opacity-30" />
 
-        {/* Player Car */}
+        {finishLine && (
+          <div
+            style={{
+              position: 'absolute',
+              left: finishLine.x,
+              top: finishLine.y,
+              width: finishLine.width,
+              height: finishLine.height,
+              backgroundColor: finishLine.color,
+              borderBottom: '2px dashed hsl(var(--foreground))',
+            }}
+            className="flex items-center justify-center"
+          >
+            <Flag className="h-6 w-6 text-accent-foreground mr-2" />
+            <span className="font-headline text-xl text-accent-foreground">{finishLine.label}</span>
+          </div>
+        )}
+
+        {obstacles.map((obs) => (
+          <div
+            key={obs.id}
+            style={{
+              position: 'absolute',
+              left: obs.x,
+              top: obs.y,
+              width: obs.width,
+              height: obs.height,
+              backgroundColor: obs.color,
+              border: '2px solid hsl(var(--border))',
+              boxShadow: '2px 2px 5px rgba(0,0,0,0.2)',
+            }}
+             className="flex items-center justify-center rounded"
+          >
+            <span className="font-body text-sm text-foreground/80">{obs.label}</span>
+          </div>
+        ))}
+
         <div
           style={{
             position: 'absolute',
             left: playerCar.x,
             top: playerCar.y,
             width: playerCar.width,
-            height: playerCar.height,
-            transition: 'left 0.05s linear, top 0.05s linear', // Smooth movement
+            height: playerCar.height, // Using actual SVG height for visual, effective height for collision
+            transition: 'left 0.05s linear, top 0.05s linear',
           }}
         >
-          <BugattiCar color={playerCar.color} direction={playerCar.direction} />
+          <BugattiCar color={playerCar.color} direction={playerCar.direction} className="w-full h-full" />
         </div>
 
-        {/* Pace Cars */}
         {paceCars.map((pc) => (
           <div
             key={pc.id}
@@ -206,15 +293,16 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
               transition: 'left 0.05s linear, top 0.05s linear',
             }}
           >
-            <ChevyCar color={pc.color} direction={pc.direction} />
+            <ChevyCar color={pc.color} direction={pc.direction} className="w-full h-full" />
           </div>
         ))}
         
         {isGameOver && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-20">
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20">
             <h2 className="text-5xl font-headline text-destructive mb-4">Game Over!</h2>
-            <p className="text-3xl font-headline text-white mb-6">Final Score: {score}</p>
-            <Button onClick={resetGame} size="lg" className="font-headline text-xl py-3 px-6">
+            <p className="text-3xl font-headline text-white mb-2">Final Score: {score}</p>
+            <p className="text-2xl font-headline text-white mb-6">Reached Level: {level}</p>
+            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6">
               <RotateCcw className="mr-2 h-5 w-5" />
               Play Again
             </Button>
@@ -222,15 +310,14 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
         )}
       </div>
       
-      {/* On-screen controls for touch/mouse */}
       {!isGameOver && (
         <div className="mt-8 grid grid-cols-3 gap-2 w-48">
-          <div></div> {/* Placeholder for top-left */}
-          <Button variant="outline" size="icon" className="p-4" onClick={() => handleKeyDown({ key: 'ArrowUp' } as KeyboardEvent)}><ArrowUp size={32} /></Button>
-          <div></div> {/* Placeholder for top-right */}
-          <Button variant="outline" size="icon" className="p-4" onClick={() => handleKeyDown({ key: 'ArrowLeft' } as KeyboardEvent)}><ArrowLeft size={32} /></Button>
-          <Button variant="outline" size="icon" className="p-4" onClick={() => handleKeyDown({ key: 'ArrowDown' } as KeyboardEvent)}><ArrowDown size={32} /></Button>
-          <Button variant="outline" size="icon" className="p-4" onClick={() => handleKeyDown({ key: 'ArrowRight' } as KeyboardEvent)}><ArrowRight size={32} /></Button>
+          <div></div>
+          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowUp')}><ArrowUp size={32} /></Button>
+          <div></div>
+          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowLeft')}><ArrowLeft size={32} /></Button>
+          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowDown')}><ArrowDown size={32} /></Button>
+          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowRight')}><ArrowRight size={32} /></Button>
         </div>
       )}
     </div>
