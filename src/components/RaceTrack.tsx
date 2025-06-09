@@ -8,7 +8,7 @@ import { BugattiCar } from '@/components/icons/BugattiCar';
 import { ChevyCar } from '@/components/icons/ChevyCar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag } from 'lucide-react'; // Added Flag icon
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag } from 'lucide-react';
 
 interface RaceTrackProps {
   playerCarColorName: CarColor;
@@ -17,8 +17,8 @@ interface RaceTrackProps {
 const TRACK_WIDTH = 800;
 const TRACK_HEIGHT = 600;
 const CAR_WIDTH = 40;
-const CAR_HEIGHT = 70; // Bugatti height is 90 based on new SVG, but keep hit box smaller
-const PLAYER_CAR_EFFECTIVE_HEIGHT = 70; // For consistent collision
+const CAR_HEIGHT = 70; 
+const PLAYER_CAR_EFFECTIVE_HEIGHT = 70;
 const MOVE_STEP = 20;
 const NUM_PACE_CARS = 3;
 const INITIAL_PACE_CAR_SPEED = 2;
@@ -27,7 +27,7 @@ const FINISH_LINE_HEIGHT = 40;
 
 export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const playerCarColor = CAR_COLORS[playerCarColorName];
-  const [score, setScore] = useState(0); // Points for reaching finish line
+  const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [paceCarSpeed, setPaceCarSpeed] = useState(INITIAL_PACE_CAR_SPEED);
   
@@ -48,7 +48,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const createPaceCar = (id: number): GameObject => ({
     id: `pace-${id}`,
     x: Math.random() * (TRACK_WIDTH - CAR_WIDTH),
-    y: Math.random() * (TRACK_HEIGHT / 2) + FINISH_LINE_HEIGHT + 20, // Start below finish line & obstacles
+    y: Math.random() * (TRACK_HEIGHT / 2) + FINISH_LINE_HEIGHT + 20, 
     width: CAR_WIDTH,
     height: CAR_HEIGHT,
     direction: 'down' as Direction,
@@ -64,7 +64,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const [isGameOver, setIsGameOver] = useState(false);
 
   const checkCollision = useCallback((car1: GameObject, car2: GameObject): boolean => {
-    const collisionPadding = 5; // Reduced padding for tighter obstacle interaction
+    const collisionPadding = 5; 
     return (
       car1.x < car2.x + car2.width - collisionPadding &&
       car1.x + car1.width - collisionPadding > car2.x &&
@@ -80,7 +80,6 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       setLevel(currentLevel);
       setScore((s) => s + 1);
     } else {
-      // Full game over reset or initial load
       currentLevel = 1;
       setLevel(1);
       setScore(0);
@@ -103,10 +102,10 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     });
 
     setObstacles([
-      { id: 'tunnel', x: TRACK_WIDTH * 0.1, y: TRACK_HEIGHT * 0.25, width: TRACK_WIDTH * 0.8, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' },
-      { id: 'bridge', x: TRACK_WIDTH * 0.3, y: TRACK_HEIGHT * 0.55, width: TRACK_WIDTH * 0.4, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up'},
-      { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.2, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'},
-      { id: 'wall-right', x: TRACK_WIDTH * 0.8, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.2, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'},
+      { id: 'tunnel', x: TRACK_WIDTH * 0.05, y: TRACK_HEIGHT * 0.25, width: TRACK_WIDTH * 0.4, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' },
+      { id: 'bridge', x: TRACK_WIDTH * 0.55, y: TRACK_HEIGHT * 0.55, width: TRACK_WIDTH * 0.4, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up'},
+      { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'}, // Slightly adjusted wall
+      { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up'}, // Slightly adjusted wall
     ]);
     
     setIsGameOver(false);
@@ -115,9 +114,9 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
 
   useEffect(() => {
-    resetGame(); // Initial setup
+    resetGame();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPlayerCarState]); // Only on initialPlayerCarState change (which is stable after mount)
+  }, [initialPlayerCarState]); 
 
   const handlePlayerMove = useCallback((key: string) => {
     if (isGameOver) return;
@@ -193,7 +192,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
           }
           
           newX = Math.max(0, Math.min(TRACK_WIDTH - CAR_WIDTH, newX));
-          newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY)); // Keep pace cars below finish line
+          newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY)); 
 
           return { ...pc, x: newX, y: newY, direction: newDirection };
         })
@@ -207,7 +206,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       }
       
       if (finishLine && checkCollision(playerCar, finishLine)) {
-        resetGame(true); // true for new level
+        resetGame(true); 
       }
 
     }, 50);
@@ -274,7 +273,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
             left: playerCar.x,
             top: playerCar.y,
             width: playerCar.width,
-            height: playerCar.height, // Using actual SVG height for visual, effective height for collision
+            height: playerCar.height,
             transition: 'left 0.05s linear, top 0.05s linear',
           }}
         >
@@ -323,3 +322,5 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     </div>
   );
 }
+
+    
