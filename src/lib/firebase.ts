@@ -16,11 +16,15 @@ const firebaseConfig = {
 // Initialize Firebase
 let app;
 if (!getApps().length) {
+  console.log('Initializing Firebase app...');
   app = initializeApp(firebaseConfig);
+  console.log('Firebase app initialized.');
 } else {
+  console.log('Using existing Firebase app.');
   app = getApp();
 }
 
 const db = getFirestore(app);
+console.log('Firestore instance created.');
 
 export { db };

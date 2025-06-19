@@ -333,6 +333,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
         setLeaderboardStatus('isTopScore'); // Allow retry
       }
     } catch (err) {
+      console.error("Error submitting score to server action:", err);
       toast({ title: "Submission Error", description: "An unexpected error occurred.", variant: "destructive" });
       setLeaderboardStatus('isTopScore'); // Allow retry
     }

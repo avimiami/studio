@@ -40,19 +40,24 @@ interface AddLeaderboardScoreInput {
 }
 
 export async function addLeaderboardScore(input: AddLeaderboardScoreInput): Promise<{ success: boolean; id?: string; error?: string }> {
+  console.log('Attempting to add leaderboard score with input:', input);
   if (!input.name || input.name.trim().length === 0) {
+    console.log('Validation failed: Name is empty.');
     return { success: false, error: 'Name cannot be empty.' };
   }
   if (input.score <= 0) { // Scores must be positive, adjust if 0 is a valid score
+    console.log('Validation failed: Score is not greater than 0.');
      return { success: false, error: 'Score must be greater than 0.'};
   }
 
   try {
+    console.log('Adding document to Firestore leaderboard collection.');
     const docRef = await addDoc(collection(db, LEADERBOARD_COLLECTION), {
       name: input.name.trim(),
       score: input.score,
       timestamp: serverTimestamp(),
     });
+    console.log('Successfully added leaderboard score with ID:', docRef.id);
     return { success: true, id: docRef.id };
   } catch (error) {
     console.error("Error adding leaderboard score: ", error);

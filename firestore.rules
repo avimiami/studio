@@ -1,0 +1,20 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Match the 'leaderboard' collection
+    match /leaderboard/{docId} {
+      // Allow anyone to read the leaderboard. This is safe.
+      allow read: if true;
+
+      // Allow anyone to create a new score.
+      // This rule is open for testing. For a real production app, you would
+      // want to add validation to ensure the data is correct, e.g.
+      // allow create: if request.resource.data.score is number;
+      allow create: if true;
+
+      // Disallow updates and deletes for this example.
+      allow update, delete: if false;
+    }
+  }
+}
