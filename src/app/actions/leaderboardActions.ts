@@ -1,8 +1,9 @@
+
 'use server';
 
 import { db } from '@/lib/firebase';
 import type { LeaderboardEntry } from '@/lib/types';
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, type Timestamp } from 'firebase/firestore';
 
 const LEADERBOARD_COLLECTION = 'leaderboard';
 const LEADERBOARD_LIMIT = 10;
@@ -18,12 +19,17 @@ export async function getLeaderboardScores(): Promise<LeaderboardEntry[]> {
     const querySnapshot = await getDocs(q);
     const scores: LeaderboardEntry[] = [];
     querySnapshot.forEach((doc) => {
-      scores.push({ id: doc.id, ...doc.data() } as LeaderboardEntry);
+      const data = doc.data();
+      scores.push({ 
+        id: doc.id, 
+        name: data.name,
+        score: data.score,
+        timestamp: data.timestamp as Timestamp // Ensure timestamp is correctly typed
+      } as LeaderboardEntry);
     });
     return scores;
   } catch (error) {
     console.error("Error fetching leaderboard scores: ", error);
-    // In a real app, you might want to throw a custom error or return a specific error object
     throw new Error('Failed to fetch leaderboard scores.');
   }
 }
@@ -37,7 +43,7 @@ export async function addLeaderboardScore(input: AddLeaderboardScoreInput): Prom
   if (!input.name || input.name.trim().length === 0) {
     return { success: false, error: 'Name cannot be empty.' };
   }
-  if (input.score <= 0) {
+  if (input.score <= 0) { // Scores must be positive, adjust if 0 is a valid score
      return { success: false, error: 'Score must be greater than 0.'};
   }
 

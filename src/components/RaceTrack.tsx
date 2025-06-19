@@ -11,14 +11,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
 import { getLeaderboardScores, addLeaderboardScore } from '@/app/actions/leaderboardActions';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Trophy, Loader2 } from 'lucide-react';
+import { LeaderboardDisplay } from '@/components/LeaderboardDisplay';
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Trophy, Loader2, ListChecks } from 'lucide-react';
 
 interface RaceTrackProps {
   playerCarColorName: CarColor;
 }
 
 const TRACK_WIDTH = 800;
-const TRACK_HEIGHT = 750; 
+const TRACK_HEIGHT = 750;
 const CAR_WIDTH = 40;
 const CAR_HEIGHT = 70;
 const PLAYER_CAR_EFFECTIVE_HEIGHT = 70;
@@ -70,6 +71,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
   const [leaderboardStatus, setLeaderboardStatus] = useState<LeaderboardStatus>('idle');
   const [playerName, setPlayerName] = useState('');
+  const [leaderboardScores, setLeaderboardScores] = useState<LeaderboardEntry[]>([]);
 
 
   const checkCollision = useCallback((car1: GameObject, car2: GameObject): boolean => {
@@ -89,7 +91,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     if (isNewLevelStart) {
       currentLevel = level + 1;
       setLevel(currentLevel);
-      currentScore = score + 1;
+      currentScore = score + 1; // Score increases by 1 per level completed
       setScore(currentScore);
     } else { // Full reset (Play Again)
       currentLevel = 1;
@@ -149,11 +151,17 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     setIsGameOver(false);
     setLeaderboardStatus('idle');
     setPlayerName('');
+    setLeaderboardScores([]); // Clear previous leaderboard scores
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
   }, [level, score, initialPlayerCarState]);
 
 
   useEffect(() => {
+    // Initialize paceCars and obstacles on mount (client-side only)
+    setPaceCars(Array.from({ length: NUM_PACE_CARS }, (_, i) => createPaceCar(i)));
+    
+    // Call resetGame to set up initial obstacles and finish line
+    // This will use Math.random, so it's important it runs client-side after initial hydration
     resetGame();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPlayerCarState]); // Only on initial mount based on car color
@@ -278,6 +286,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       setLeaderboardStatus('loading');
       getLeaderboardScores()
         .then((topScores) => {
+          setLeaderboardScores(topScores); // Store for potential display
           if (topScores.length < 10 || score > (topScores[topScores.length - 1]?.score || 0)) {
             setLeaderboardStatus('isTopScore');
           } else {
@@ -288,7 +297,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
           console.error("Failed to check leaderboard", err);
           toast({
             title: "Leaderboard Error",
-            description: "Could not connect to the leaderboard. Your score won't be saved.",
+            description: "Could not connect to the leaderboard.",
             variant: "destructive",
           });
           setLeaderboardStatus('error');
@@ -307,7 +316,18 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       const result = await addLeaderboardScore({ name: playerName, score });
       if (result.success) {
         toast({ title: "Score Saved!", description: "You're on the leaderboard!", className: "bg-green-500 text-white" });
-        setLeaderboardStatus('submitted');
+        // Re-fetch leaderboard to show the new score
+        setLeaderboardStatus('loading'); // Show loading while re-fetching
+        getLeaderboardScores()
+          .then(updatedScores => {
+            setLeaderboardScores(updatedScores);
+            setLeaderboardStatus('submitted');
+          })
+          .catch(() => {
+            // If re-fetch fails, still mark as submitted, but leaderboard might be stale
+            setLeaderboardStatus('submitted'); 
+            toast({ title: "Leaderboard Update", description: "Could not refresh leaderboard, but your score is saved.", variant: "default"});
+          });
       } else {
         toast({ title: "Submission Failed", description: result.error || "Could not save your score.", variant: "destructive" });
         setLeaderboardStatus('isTopScore'); // Allow retry
@@ -398,19 +418,19 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
         ))}
 
         {isGameOver && (
-          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 p-4">
-            <h2 className="text-5xl font-headline text-destructive mb-4">Game Over!</h2>
-            <p className="text-3xl font-headline text-white mb-2">Final Score: {score}</p>
-            <p className="text-2xl font-headline text-white mb-6">Reached Level: {level}</p>
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 p-4 space-y-4 overflow-y-auto">
+            <h2 className="text-5xl font-headline text-destructive">Game Over!</h2>
+            <p className="text-3xl font-headline text-white">Final Score: {score}</p>
+            <p className="text-2xl font-headline text-white">Reached Level: {level}</p>
 
-            {leaderboardStatus === 'loading' && (
-              <div className="flex items-center text-white text-lg my-4">
+            {(leaderboardStatus === 'loading') && (
+              <div className="flex items-center text-white text-lg">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Checking leaderboard...
               </div>
             )}
 
             {leaderboardStatus === 'isTopScore' && (
-              <form onSubmit={handleNameSubmit} className="flex flex-col items-center space-y-3 my-4 w-full max-w-xs">
+              <form onSubmit={handleNameSubmit} className="flex flex-col items-center space-y-3 w-full max-w-xs">
                 <p className="text-xl text-yellow-400 font-semibold flex items-center"><Trophy className="mr-2 h-6 w-6 text-yellow-400" /> You made the Top 10!</p>
                 <Input
                   type="text"
@@ -426,25 +446,29 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
               </form>
             )}
             
-            {leaderboardStatus === 'submitting' && (
-              <div className="flex items-center text-white text-lg my-4">
+            {(leaderboardStatus === 'submitting') && (
+              <div className="flex items-center text-white text-lg">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting score...
               </div>
             )}
-
-            {leaderboardStatus === 'submitted' && (
-               <p className="text-xl text-green-400 font-semibold my-4">Score Saved!</p>
+            
+            {/* Leaderboard Display Section */}
+            {(leaderboardStatus === 'notTopScore' || leaderboardStatus === 'submitted' || (leaderboardStatus === 'error' && leaderboardScores.length > 0)) && (
+                leaderboardScores.length > 0 ? (
+                    <LeaderboardDisplay entries={leaderboardScores} />
+                ) : (
+                   leaderboardStatus !== 'error' && <p className="text-lg text-white">Leaderboard is currently empty. Be the first!</p>
+                )
+            )}
+            {leaderboardStatus === 'error' && leaderboardScores.length === 0 && (
+                 <p className="text-lg text-red-400 my-2">Could not load leaderboard data.</p>
+            )}
+             {leaderboardStatus === 'submitted' && playerName && (
+               <p className="text-xl text-green-400 font-semibold">Score saved, {playerName}!</p>
             )}
 
-            {leaderboardStatus === 'notTopScore' && score > 0 && (
-               <p className="text-lg text-white my-4">Good game! Keep practicing to make the leaderboard.</p>
-            )}
-             {leaderboardStatus === 'error' && (
-               <p className="text-lg text-red-400 my-4">Could not check leaderboard. Try again later.</p>
-            )}
 
-
-            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6 mt-2">
+            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6 !mt-6"> {/* Added !mt-6 for spacing */}
               <RotateCcw className="mr-2 h-5 w-5" />
               Play Again
             </Button>
@@ -465,4 +489,3 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     </div>
   );
 }
-
