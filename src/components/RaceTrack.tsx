@@ -17,7 +17,7 @@ interface RaceTrackProps {
 const TRACK_WIDTH = 800;
 const TRACK_HEIGHT = 750; // Increased height
 const CAR_WIDTH = 40;
-const CAR_HEIGHT = 70; 
+const CAR_HEIGHT = 70;
 const PLAYER_CAR_EFFECTIVE_HEIGHT = 70;
 const MOVE_STEP = 20;
 const NUM_PACE_CARS = 3;
@@ -32,7 +32,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [paceCarSpeed, setPaceCarSpeed] = useState(INITIAL_PACE_CAR_SPEED);
-  
+
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
   const initialPlayerCarState = useMemo(() => ({
@@ -50,23 +50,20 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const createPaceCar = (id: number): GameObject => ({
     id: `pace-${id}`,
     x: Math.random() * (TRACK_WIDTH - CAR_WIDTH),
-    y: Math.random() * (TRACK_HEIGHT / 2) + FINISH_LINE_HEIGHT + 20, 
+    y: Math.random() * (TRACK_HEIGHT / 2) + FINISH_LINE_HEIGHT + 20,
     width: CAR_WIDTH,
     height: CAR_HEIGHT,
     direction: 'down' as Direction,
     color: '#555555',
   });
 
-  const [paceCars, setPaceCars] = useState<GameObject[]>(() =>
-    Array.from({ length: NUM_PACE_CARS }, (_, i) => createPaceCar(i))
-  );
-  
+  const [paceCars, setPaceCars] = useState<GameObject[]>([]); // Initialize with empty array
   const [obstacles, setObstacles] = useState<GameObject[]>([]);
   const [finishLine, setFinishLine] = useState<GameObject | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
 
   const checkCollision = useCallback((car1: GameObject, car2: GameObject): boolean => {
-    const collisionPadding = 5; 
+    const collisionPadding = 5;
     return (
       car1.x < car2.x + car2.width - collisionPadding &&
       car1.x + car1.width - collisionPadding > car2.x &&
@@ -97,29 +94,29 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       y: 0,
       width: TRACK_WIDTH,
       height: FINISH_LINE_HEIGHT,
-      color: 'hsl(var(--primary))', 
+      color: 'hsl(var(--primary))',
       isFinishLine: true,
       label: 'FINISH',
       direction: 'up',
     });
 
-    const obstacleEffectiveWidth = TRACK_WIDTH * 0.35; 
+    const obstacleEffectiveWidth = TRACK_WIDTH * 0.35;
     const trackMargin = TRACK_WIDTH * 0.05;
 
     const leftPlacementMaxRandomRange = (TRACK_WIDTH / 2) - obstacleEffectiveWidth - (2 * trackMargin);
     const rightPlacementMaxRandomRange = (TRACK_WIDTH / 2) - obstacleEffectiveWidth - (2 * trackMargin);
-    
+
     let tunnelX, bridgeX;
 
     // Alternate obstacle placement for variety
-    if (currentLevel % 2 === 1) { 
+    if (currentLevel % 2 === 1) {
       tunnelX = trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange);
       bridgeX = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, rightPlacementMaxRandomRange);
-    } else { 
+    } else {
       tunnelX = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, rightPlacementMaxRandomRange);
       bridgeX = trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange);
     }
-    
+
     const actualTunnelWidth = TRACK_WIDTH * 0.35;
     const actualBridgeWidth = TRACK_WIDTH * 0.35;
 
@@ -133,7 +130,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
       { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
     ]);
-    
+
     setIsGameOver(false);
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
   }, [level, initialPlayerCarState]);
@@ -142,7 +139,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   useEffect(() => {
     resetGame();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPlayerCarState]); 
+  }, [initialPlayerCarState]);
 
   const handlePlayerMove = useCallback((key: string) => {
     if (isGameOver) return;
@@ -176,7 +173,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
       for (const obs of obstacles) {
         if (checkCollision(proposedCar, obs)) {
-          return prev; 
+          return prev;
         }
       }
       return proposedCar;
@@ -194,13 +191,13 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
 
   useEffect(() => {
-    if (isGameOver) {
+    if (isGameOver || !paceCars.length || !obstacles.length || !finishLine) { // Ensure game elements are initialized
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       return;
     }
-    
+
     gameLoopRef.current = setInterval(() => {
-      setPaceCars(prevPaceCars => 
+      setPaceCars(prevPaceCars =>
         prevPaceCars.map(pc => {
           let newX = pc.x;
           let newY = pc.y;
@@ -216,26 +213,21 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
             if (dy > 0) { newY += paceCarSpeed; newDirection = 'down'; }
             else { newY -= paceCarSpeed; newDirection = 'up'; }
           }
-          
+
           newX = Math.max(0, Math.min(TRACK_WIDTH - CAR_WIDTH, newX));
-          newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY)); 
+          newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY));
 
           const proposedPaceCar = { ...pc, x: newX, y: newY, direction: newDirection };
 
-          // Pace cars should try to avoid obstacles too (simple version)
           for (const obs of obstacles) {
             if (checkCollision(proposedPaceCar, obs)) {
-              // If collision, try to move away randomly or revert
-              // For simplicity, we can revert or slightly alter path
-              // This is a basic avoidance, more complex AI could be added
-              if (Math.random() < 0.5) { // 50% chance to revert X
+              if (Math.random() < 0.5) {
                  proposedPaceCar.x = pc.x;
-              } else { // 50% chance to revert Y
+              } else {
                  proposedPaceCar.y = pc.y;
               }
-              // Try moving slightly to the side if stuck
               if (Math.random() < 0.2) proposedPaceCar.x += (Math.random() < 0.5 ? -MOVE_STEP/2 : MOVE_STEP/2);
-              break; 
+              break;
             }
           }
           return proposedPaceCar;
@@ -245,12 +237,12 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       for (const pc of paceCars) {
         if (checkCollision(playerCar, pc)) {
           setIsGameOver(true);
-          break; 
+          break;
         }
       }
-      
+
       if (finishLine && checkCollision(playerCar, finishLine)) {
-        resetGame(true); 
+        resetGame(true);
       }
 
     }, 50);
@@ -259,13 +251,13 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerCar, paceCars, checkCollision, isGameOver, finishLine, paceCarSpeed, resetGame, obstacles]);
+  }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame]);
 
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-4">
       <ScoreDisplay score={score} level={level} />
-      <div 
+      <div
         className="relative bg-muted/70 border-4 border-primary rounded-lg shadow-2xl overflow-hidden"
         style={{ width: TRACK_WIDTH, height: TRACK_HEIGHT }}
         role="img"
@@ -339,7 +331,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
             <ChevyCar color={pc.color} direction={pc.direction} className="w-full h-full" />
           </div>
         ))}
-        
+
         {isGameOver && (
           <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20">
             <h2 className="text-5xl font-headline text-destructive mb-4">Game Over!</h2>
@@ -352,7 +344,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
           </div>
         )}
       </div>
-      
+
       {!isGameOver && (
         <div className="mt-8 grid grid-cols-3 gap-2 w-48">
           <div></div>
@@ -366,5 +358,3 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     </div>
   );
 }
-
-    
