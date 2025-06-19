@@ -4,13 +4,13 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID" // Optional
+  apiKey: "AIzaSyAzzH3P1q5mX-hGHlF5IAldgblCt2JopwM",
+  authDomain: "velocity-chaser.firebaseapp.com",
+  projectId: "velocity-chaser",
+  storageBucket: "velocity-chaser.firebasestorage.app",
+  messagingSenderId: "847307623330",
+  appId: "1:847307623330:web:ee5aef63ee76f3e1e200fb",
+  measurementId: "G-1LSBVMPZXC"
 };
 
 // Initialize Firebase
