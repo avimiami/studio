@@ -15,7 +15,7 @@ interface RaceTrackProps {
 }
 
 const TRACK_WIDTH = 800;
-const TRACK_HEIGHT = 600;
+const TRACK_HEIGHT = 750; // Increased height
 const CAR_WIDTH = 40;
 const CAR_HEIGHT = 70; 
 const PLAYER_CAR_EFFECTIVE_HEIGHT = 70;
@@ -24,6 +24,8 @@ const NUM_PACE_CARS = 3;
 const INITIAL_PACE_CAR_SPEED = 2;
 const PACE_CAR_SPEED_INCREMENT = 0.5;
 const FINISH_LINE_HEIGHT = 40;
+const ROADBLOCK_WIDTH = TRACK_WIDTH * 0.4; // Roadblock will take 40% of track width
+const ROADBLOCK_HEIGHT = 30;
 
 export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const playerCarColor = CAR_COLORS[playerCarColorName];
@@ -36,7 +38,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const initialPlayerCarState = useMemo(() => ({
     id: 'player',
     x: TRACK_WIDTH / 2 - CAR_WIDTH / 2,
-    y: TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT - 20,
+    y: TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT - 20, // Adjusted for new height
     width: CAR_WIDTH,
     height: PLAYER_CAR_EFFECTIVE_HEIGHT,
     direction: 'up' as Direction,
@@ -109,6 +111,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     
     let tunnelX, bridgeX;
 
+    // Alternate obstacle placement for variety
     if (currentLevel % 2 === 1) { 
       tunnelX = trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange);
       bridgeX = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, rightPlacementMaxRandomRange);
@@ -120,11 +123,15 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     const actualTunnelWidth = TRACK_WIDTH * 0.35;
     const actualBridgeWidth = TRACK_WIDTH * 0.35;
 
+    // Roadblock in the middle
+    const roadblockX = TRACK_WIDTH / 2 - ROADBLOCK_WIDTH / 2;
+
     setObstacles([
-      { id: 'tunnel', x: tunnelX, y: TRACK_HEIGHT * 0.25, width: actualTunnelWidth, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' as Direction },
-      { id: 'bridge', x: bridgeX, y: TRACK_HEIGHT * 0.55, width: actualBridgeWidth, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up' as Direction},
-      { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
-      { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.4, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
+      { id: 'tunnel', x: tunnelX, y: TRACK_HEIGHT * 0.20, width: actualTunnelWidth, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' as Direction },
+      { id: 'bridge', x: bridgeX, y: TRACK_HEIGHT * 0.45, width: actualBridgeWidth, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up' as Direction},
+      { id: 'roadblock', x: roadblockX, y: TRACK_HEIGHT * 0.70, width: ROADBLOCK_WIDTH, height: ROADBLOCK_HEIGHT, color: 'hsl(var(--destructive))', isObstacle: true, label: 'Roadblock', direction: 'up' as Direction},
+      { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
+      { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
     ]);
     
     setIsGameOver(false);
@@ -213,7 +220,25 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
           newX = Math.max(0, Math.min(TRACK_WIDTH - CAR_WIDTH, newX));
           newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY)); 
 
-          return { ...pc, x: newX, y: newY, direction: newDirection };
+          const proposedPaceCar = { ...pc, x: newX, y: newY, direction: newDirection };
+
+          // Pace cars should try to avoid obstacles too (simple version)
+          for (const obs of obstacles) {
+            if (checkCollision(proposedPaceCar, obs)) {
+              // If collision, try to move away randomly or revert
+              // For simplicity, we can revert or slightly alter path
+              // This is a basic avoidance, more complex AI could be added
+              if (Math.random() < 0.5) { // 50% chance to revert X
+                 proposedPaceCar.x = pc.x;
+              } else { // 50% chance to revert Y
+                 proposedPaceCar.y = pc.y;
+              }
+              // Try moving slightly to the side if stuck
+              if (Math.random() < 0.2) proposedPaceCar.x += (Math.random() < 0.5 ? -MOVE_STEP/2 : MOVE_STEP/2);
+              break; 
+            }
+          }
+          return proposedPaceCar;
         })
       );
 
@@ -234,7 +259,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerCar, paceCars, checkCollision, isGameOver, finishLine, paceCarSpeed, resetGame]);
+  }, [playerCar, paceCars, checkCollision, isGameOver, finishLine, paceCarSpeed, resetGame, obstacles]);
 
 
   return (
@@ -342,5 +367,4 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   );
 }
 
-    
     
