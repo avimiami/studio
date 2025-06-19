@@ -2,20 +2,23 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { CarColor, Direction, GameObject } from '@/lib/types';
+import type { CarColor, Direction, GameObject, LeaderboardEntry } from '@/lib/types';
 import { CAR_COLORS } from '@/lib/types';
 import { BugattiCar } from '@/components/icons/BugattiCar';
 import { ChevyCar } from '@/components/icons/ChevyCar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useToast } from "@/hooks/use-toast";
+import { getLeaderboardScores, addLeaderboardScore } from '@/app/actions/leaderboardActions';
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Trophy, Loader2 } from 'lucide-react';
 
 interface RaceTrackProps {
   playerCarColorName: CarColor;
 }
 
 const TRACK_WIDTH = 800;
-const TRACK_HEIGHT = 750; // Increased height
+const TRACK_HEIGHT = 750; 
 const CAR_WIDTH = 40;
 const CAR_HEIGHT = 70;
 const PLAYER_CAR_EFFECTIVE_HEIGHT = 70;
@@ -24,21 +27,24 @@ const NUM_PACE_CARS = 3;
 const INITIAL_PACE_CAR_SPEED = 2;
 const PACE_CAR_SPEED_INCREMENT = 0.5;
 const FINISH_LINE_HEIGHT = 40;
-const ROADBLOCK_WIDTH = TRACK_WIDTH * 0.4; // Roadblock will take 40% of track width
+const ROADBLOCK_WIDTH = TRACK_WIDTH * 0.4;
 const ROADBLOCK_HEIGHT = 30;
+
+type LeaderboardStatus = 'idle' | 'loading' | 'isTopScore' | 'notTopScore' | 'error' | 'submitting' | 'submitted';
 
 export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const playerCarColor = CAR_COLORS[playerCarColorName];
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [paceCarSpeed, setPaceCarSpeed] = useState(INITIAL_PACE_CAR_SPEED);
+  const { toast } = useToast();
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
   const initialPlayerCarState = useMemo(() => ({
     id: 'player',
     x: TRACK_WIDTH / 2 - CAR_WIDTH / 2,
-    y: TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT - 20, // Adjusted for new height
+    y: TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT - 20,
     width: CAR_WIDTH,
     height: PLAYER_CAR_EFFECTIVE_HEIGHT,
     direction: 'up' as Direction,
@@ -57,10 +63,14 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     color: '#555555',
   });
 
-  const [paceCars, setPaceCars] = useState<GameObject[]>([]); // Initialize with empty array
+  const [paceCars, setPaceCars] = useState<GameObject[]>([]);
   const [obstacles, setObstacles] = useState<GameObject[]>([]);
   const [finishLine, setFinishLine] = useState<GameObject | null>(null);
   const [isGameOver, setIsGameOver] = useState(false);
+
+  const [leaderboardStatus, setLeaderboardStatus] = useState<LeaderboardStatus>('idle');
+  const [playerName, setPlayerName] = useState('');
+
 
   const checkCollision = useCallback((car1: GameObject, car2: GameObject): boolean => {
     const collisionPadding = 5;
@@ -74,13 +84,17 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
   const resetGame = useCallback((isNewLevelStart = false) => {
     let currentLevel = level;
+    let currentScore = score;
+
     if (isNewLevelStart) {
       currentLevel = level + 1;
       setLevel(currentLevel);
-      setScore((s) => s + 1);
-    } else {
+      currentScore = score + 1;
+      setScore(currentScore);
+    } else { // Full reset (Play Again)
       currentLevel = 1;
       setLevel(1);
+      currentScore = 0;
       setScore(0);
     }
 
@@ -108,7 +122,6 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
     let tunnelX, bridgeX;
 
-    // Alternate obstacle placement for variety
     if (currentLevel % 2 === 1) {
       tunnelX = trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange);
       bridgeX = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, rightPlacementMaxRandomRange);
@@ -116,11 +129,13 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       tunnelX = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, rightPlacementMaxRandomRange);
       bridgeX = trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange);
     }
+    
+    tunnelX = Math.max(trackMargin, Math.min(tunnelX, TRACK_WIDTH - trackMargin - obstacleEffectiveWidth));
+    bridgeX = Math.max(trackMargin, Math.min(bridgeX, TRACK_WIDTH - trackMargin - obstacleEffectiveWidth));
+
 
     const actualTunnelWidth = TRACK_WIDTH * 0.35;
     const actualBridgeWidth = TRACK_WIDTH * 0.35;
-
-    // Roadblock in the middle
     const roadblockX = TRACK_WIDTH / 2 - ROADBLOCK_WIDTH / 2;
 
     setObstacles([
@@ -132,14 +147,16 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     ]);
 
     setIsGameOver(false);
+    setLeaderboardStatus('idle');
+    setPlayerName('');
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-  }, [level, initialPlayerCarState]);
+  }, [level, score, initialPlayerCarState]);
 
 
   useEffect(() => {
     resetGame();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPlayerCarState]);
+  }, [initialPlayerCarState]); // Only on initial mount based on car color
 
   const handlePlayerMove = useCallback((key: string) => {
     if (isGameOver) return;
@@ -190,8 +207,9 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   }, [handlePlayerMove]);
 
 
+  // Game Loop Effect
   useEffect(() => {
-    if (isGameOver || !paceCars.length || !obstacles.length || !finishLine) { // Ensure game elements are initialized
+    if (isGameOver || !paceCars.length || !obstacles.length || !finishLine) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       return;
     }
@@ -242,7 +260,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       }
 
       if (finishLine && checkCollision(playerCar, finishLine)) {
-        resetGame(true);
+        resetGame(true); // true indicates it's a new level start
       }
 
     }, 50);
@@ -252,6 +270,53 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame]);
+
+
+  // Leaderboard Check Effect
+  useEffect(() => {
+    if (isGameOver && score > 0 && leaderboardStatus === 'idle') {
+      setLeaderboardStatus('loading');
+      getLeaderboardScores()
+        .then((topScores) => {
+          if (topScores.length < 10 || score > (topScores[topScores.length - 1]?.score || 0)) {
+            setLeaderboardStatus('isTopScore');
+          } else {
+            setLeaderboardStatus('notTopScore');
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to check leaderboard", err);
+          toast({
+            title: "Leaderboard Error",
+            description: "Could not connect to the leaderboard. Your score won't be saved.",
+            variant: "destructive",
+          });
+          setLeaderboardStatus('error');
+        });
+    }
+  }, [isGameOver, score, toast, leaderboardStatus]);
+
+  const handleNameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!playerName.trim()) {
+      toast({ title: "Name Required", description: "Please enter your name for the leaderboard.", variant: "destructive" });
+      return;
+    }
+    setLeaderboardStatus('submitting');
+    try {
+      const result = await addLeaderboardScore({ name: playerName, score });
+      if (result.success) {
+        toast({ title: "Score Saved!", description: "You're on the leaderboard!", className: "bg-green-500 text-white" });
+        setLeaderboardStatus('submitted');
+      } else {
+        toast({ title: "Submission Failed", description: result.error || "Could not save your score.", variant: "destructive" });
+        setLeaderboardStatus('isTopScore'); // Allow retry
+      }
+    } catch (err) {
+      toast({ title: "Submission Error", description: "An unexpected error occurred.", variant: "destructive" });
+      setLeaderboardStatus('isTopScore'); // Allow retry
+    }
+  };
 
 
   return (
@@ -333,11 +398,53 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
         ))}
 
         {isGameOver && (
-          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20">
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 p-4">
             <h2 className="text-5xl font-headline text-destructive mb-4">Game Over!</h2>
             <p className="text-3xl font-headline text-white mb-2">Final Score: {score}</p>
             <p className="text-2xl font-headline text-white mb-6">Reached Level: {level}</p>
-            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6">
+
+            {leaderboardStatus === 'loading' && (
+              <div className="flex items-center text-white text-lg my-4">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Checking leaderboard...
+              </div>
+            )}
+
+            {leaderboardStatus === 'isTopScore' && (
+              <form onSubmit={handleNameSubmit} className="flex flex-col items-center space-y-3 my-4 w-full max-w-xs">
+                <p className="text-xl text-yellow-400 font-semibold flex items-center"><Trophy className="mr-2 h-6 w-6 text-yellow-400" /> You made the Top 10!</p>
+                <Input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="text-center"
+                  maxLength={20}
+                />
+                <Button type="submit" size="lg" className="font-headline text-lg bg-green-500 hover:bg-green-600">
+                  Save Score
+                </Button>
+              </form>
+            )}
+            
+            {leaderboardStatus === 'submitting' && (
+              <div className="flex items-center text-white text-lg my-4">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting score...
+              </div>
+            )}
+
+            {leaderboardStatus === 'submitted' && (
+               <p className="text-xl text-green-400 font-semibold my-4">Score Saved!</p>
+            )}
+
+            {leaderboardStatus === 'notTopScore' && score > 0 && (
+               <p className="text-lg text-white my-4">Good game! Keep practicing to make the leaderboard.</p>
+            )}
+             {leaderboardStatus === 'error' && (
+               <p className="text-lg text-red-400 my-4">Could not check leaderboard. Try again later.</p>
+            )}
+
+
+            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6 mt-2">
               <RotateCcw className="mr-2 h-5 w-5" />
               Play Again
             </Button>
@@ -358,3 +465,4 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     </div>
   );
 }
+
