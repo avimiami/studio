@@ -20,5 +20,6 @@ export interface GameObject {
   color: string;
   isObstacle?: boolean;
   isFinishLine?: boolean;
+  isChanceGate?: boolean;
   label?: string; // For displaying text on obstacles/finish line
 }

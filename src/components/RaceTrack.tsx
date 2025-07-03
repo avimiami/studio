@@ -8,7 +8,9 @@ import { BugattiCar } from '@/components/icons/BugattiCar';
 import { ChevyCar } from '@/components/icons/ChevyCar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
 
 interface RaceTrackProps {
   playerCarColorName: CarColor;
@@ -32,6 +34,10 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [paceCarSpeed, setPaceCarSpeed] = useState(INITIAL_PACE_CAR_SPEED);
+  
+  const { toast } = useToast();
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [isGateOpen, setIsGateOpen] = useState(false);
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -92,6 +98,9 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     setPlayerCar(initialPlayerCarState);
     setPaceCars(Array.from({ length: NUM_PACE_CARS }, (_, i) => createPaceCar(i)));
     setPaceCarSpeed(INITIAL_PACE_CAR_SPEED + (currentLevel - 1) * PACE_CAR_SPEED_INCREMENT);
+    
+    setIsSpinning(false);
+    setIsGateOpen(false);
 
     setFinishLine({
       id: 'finish',
@@ -127,19 +136,18 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
     const actualTunnelWidth = TRACK_WIDTH * 0.35;
     const actualBridgeWidth = TRACK_WIDTH * 0.35;
-    const roadblockX = TRACK_WIDTH / 2 - ROADBLOCK_WIDTH / 2;
 
     setObstacles([
       { id: 'tunnel', x: tunnelX, y: TRACK_HEIGHT * 0.20, width: actualTunnelWidth, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' as Direction },
       { id: 'bridge', x: bridgeX, y: TRACK_HEIGHT * 0.45, width: actualBridgeWidth, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up' as Direction},
-      { id: 'roadblock', x: roadblockX, y: TRACK_HEIGHT * 0.70, width: ROADBLOCK_WIDTH, height: ROADBLOCK_HEIGHT, color: 'hsl(var(--destructive))', isObstacle: true, label: 'Roadblock', direction: 'up' as Direction},
+      { id: 'spinnerGate', x: TRACK_WIDTH / 2 - ROADBLOCK_WIDTH / 2, y: TRACK_HEIGHT * 0.70, width: ROADBLOCK_WIDTH, height: ROADBLOCK_HEIGHT, color: 'hsl(var(--accent))', isObstacle: true, isChanceGate: true, label: 'Spinner Gate', direction: 'up' as Direction},
       { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
       { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
     ]);
 
     setIsGameOver(false);
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-  }, [level, score, initialPlayerCarState]);
+  }, [level, score, initialPlayerCarState, toast]);
 
 
   useEffect(() => {
@@ -153,7 +161,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   }, [initialPlayerCarState]); // Only on initial mount based on car color
 
   const handlePlayerMove = useCallback((key: string) => {
-    if (isGameOver) return;
+    if (isGameOver || isSpinning) return;
     setPlayerCar((prev) => {
       let newX = prev.x;
       let newY = prev.y;
@@ -184,12 +192,32 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
       for (const obs of obstacles) {
         if (checkCollision(proposedCar, obs)) {
+          if (obs.isChanceGate) {
+            if (isGateOpen) {
+              continue; // Gate is open, allow movement
+            } else {
+              // Trigger spinner
+              setIsSpinning(true);
+              setTimeout(() => {
+                const success = Math.random() < 0.25;
+                if (success) {
+                  setIsGateOpen(true);
+                  toast({ title: "Success!", description: "The gate is unlocked." });
+                } else {
+                  toast({ variant: "destructive", title: "Access Denied!", description: "The gate remains locked. Try again." });
+                }
+                setIsSpinning(false);
+              }, 1500);
+              return prev; // Block movement for now, spinner is triggered
+            }
+          }
+          // It's a regular obstacle, block movement
           return prev;
         }
       }
       return proposedCar;
     });
-  }, [isGameOver, obstacles, checkCollision]);
+  }, [isGameOver, isSpinning, obstacles, checkCollision, toast, isGateOpen]);
 
 
   useEffect(() => {
@@ -233,6 +261,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
           for (const obs of obstacles) {
             if (checkCollision(proposedPaceCar, obs)) {
+              if (obs.isChanceGate && isGateOpen) continue; // Pace cars can also pass open gate
               if (Math.random() < 0.5) {
                  proposedPaceCar.x = pc.x;
               } else {
@@ -263,7 +292,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame]);
+  }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame, isGateOpen]);
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-4">
@@ -307,10 +336,17 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
               backgroundColor: obs.color,
               border: '2px solid hsl(var(--border))',
               boxShadow: '2px 2px 5px rgba(0,0,0,0.2)',
+              opacity: (obs.isChanceGate && isGateOpen) ? 0.4 : 1,
+              transition: 'opacity 0.3s ease-in-out',
             }}
              className="flex items-center justify-center rounded"
           >
-            <span className="font-body text-sm text-foreground/80">{obs.label}</span>
+            {obs.isChanceGate && isSpinning && (
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
+            )}
+            {!isSpinning && (
+              <span className="font-body text-sm text-foreground/80">{obs.label}</span>
+            )}
           </div>
         ))}
 
