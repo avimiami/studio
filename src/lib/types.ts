@@ -1,6 +1,4 @@
 
-import type { Timestamp } from 'firebase/firestore';
-
 export type CarColor = 'blue' | 'yellow' | 'pink' | 'red';
 
 export const CAR_COLORS: Record<CarColor, string> = {
@@ -23,11 +21,4 @@ export interface GameObject {
   isObstacle?: boolean;
   isFinishLine?: boolean;
   label?: string; // For displaying text on obstacles/finish line
-}
-
-export interface LeaderboardEntry {
-  id?: string; // Document ID from Firestore
-  name: string;
-  score: number;
-  timestamp: Timestamp | Date; // Firestore Timestamp or Date for server-side
 }

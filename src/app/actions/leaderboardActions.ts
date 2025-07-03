@@ -5,6 +5,8 @@ import { db } from '@/lib/firebase';
 import type { LeaderboardEntry } from '@/lib/types';
 import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, type Timestamp } from 'firebase/firestore';
 
+console.log('leaderboardActions.ts module loaded. db object:', db);
+
 const LEADERBOARD_COLLECTION = 'leaderboard';
 const LEADERBOARD_LIMIT = 10;
 
@@ -40,7 +42,7 @@ interface AddLeaderboardScoreInput {
 }
 
 export async function addLeaderboardScore(input: AddLeaderboardScoreInput): Promise<{ success: boolean; id?: string; error?: string }> {
-  console.log('Attempting to add leaderboard score with input:', input);
+  console.log('addLeaderboardScore called with input:', input);
   if (!input.name || input.name.trim().length === 0) {
     console.log('Validation failed: Name is empty.');
     return { success: false, error: 'Name cannot be empty.' };
@@ -51,13 +53,13 @@ export async function addLeaderboardScore(input: AddLeaderboardScoreInput): Prom
   }
 
   try {
-    console.log('Adding document to Firestore leaderboard collection.');
+    console.log('Attempting to add document to Firestore collection:', LEADERBOARD_COLLECTION);
     const docRef = await addDoc(collection(db, LEADERBOARD_COLLECTION), {
       name: input.name.trim(),
       score: input.score,
       timestamp: serverTimestamp(),
     });
-    console.log('Successfully added leaderboard score with ID:', docRef.id);
+    console.log('Successfully added document with ID:', docRef.id);
     return { success: true, id: docRef.id };
   } catch (error) {
     console.error("Error adding leaderboard score: ", error);
