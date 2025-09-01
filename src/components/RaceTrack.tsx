@@ -21,7 +21,7 @@ const TRACK_HEIGHT = 750;
 const CAR_WIDTH = 40;
 const CAR_HEIGHT = 70;
 const PLAYER_CAR_EFFECTIVE_HEIGHT = 70;
-const MOVE_STEP = 20;
+const INITIAL_MOVE_STEP = 20;
 const NUM_PACE_CARS = 3;
 const INITIAL_PACE_CAR_SPEED = 2;
 const PACE_CAR_SPEED_INCREMENT = 0.5;
@@ -162,6 +162,9 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
   const handlePlayerMove = useCallback((key: string) => {
     if (isGameOver || isSpinning) return;
+
+    const moveStep = level >= 10 ? INITIAL_MOVE_STEP * 1.4 : INITIAL_MOVE_STEP;
+
     setPlayerCar((prev) => {
       let newX = prev.x;
       let newY = prev.y;
@@ -169,19 +172,19 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
       switch (key) {
         case 'ArrowUp':
-          newY = Math.max(0, prev.y - MOVE_STEP);
+          newY = Math.max(0, prev.y - moveStep);
           newDirection = 'up';
           break;
         case 'ArrowDown':
-          newY = Math.min(TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT, prev.y + MOVE_STEP);
+          newY = Math.min(TRACK_HEIGHT - PLAYER_CAR_EFFECTIVE_HEIGHT, prev.y + moveStep);
           newDirection = 'down';
           break;
         case 'ArrowLeft':
-          newX = Math.max(0, prev.x - MOVE_STEP);
+          newX = Math.max(0, prev.x - moveStep);
           newDirection = 'left';
           break;
         case 'ArrowRight':
-          newX = Math.min(TRACK_WIDTH - CAR_WIDTH, prev.x + MOVE_STEP);
+          newX = Math.min(TRACK_WIDTH - CAR_WIDTH, prev.x + moveStep);
           newDirection = 'right';
           break;
         default:
@@ -217,7 +220,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       }
       return proposedCar;
     });
-  }, [isGameOver, isSpinning, obstacles, checkCollision, toast, isGateOpen]);
+  }, [isGameOver, isSpinning, obstacles, checkCollision, toast, isGateOpen, level]);
 
 
   useEffect(() => {
@@ -267,7 +270,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
               } else {
                  proposedPaceCar.y = pc.y;
               }
-              if (Math.random() < 0.2) proposedPaceCar.x += (Math.random() < 0.5 ? -MOVE_STEP/2 : MOVE_STEP/2);
+              if (Math.random() < 0.2) proposedPaceCar.x += (Math.random() < 0.5 ? -INITIAL_MOVE_STEP/2 : INITIAL_MOVE_STEP/2);
               break;
             }
           }
@@ -406,3 +409,5 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     </div>
   );
 }
+
+    
