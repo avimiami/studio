@@ -163,7 +163,12 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const handlePlayerMove = useCallback((key: string) => {
     if (isGameOver || isSpinning) return;
 
-    const moveStep = level >= 10 ? INITIAL_MOVE_STEP * 1.4 : INITIAL_MOVE_STEP;
+    let moveStep = INITIAL_MOVE_STEP;
+    if (level >= 10) {
+      moveStep = INITIAL_MOVE_STEP * 1.4; // 40% boost
+    } else if (level >= 3) {
+      moveStep = INITIAL_MOVE_STEP * 1.1; // 10% boost
+    }
 
     setPlayerCar((prev) => {
       let newX = prev.x;
