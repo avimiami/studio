@@ -8,7 +8,7 @@ import { BugattiCar } from '@/components/icons/BugattiCar';
 import { ChevyCar } from '@/components/icons/ChevyCar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Loader2, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Loader2, Zap, Snowflake } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -39,6 +39,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const [isSpinning, setIsSpinning] = useState(false);
   const [isGateOpen, setIsGateOpen] = useState(false);
   const [isSuperBoostActive, setIsSuperBoostActive] = useState(false);
+  const [isFreezeActive, setIsFreezeActive] = useState(false);
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -103,6 +104,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     setIsSpinning(false);
     setIsGateOpen(false);
     setIsSuperBoostActive(false);
+    setIsFreezeActive(false);
 
     setFinishLine({
       id: 'finish',
@@ -251,43 +253,45 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     }
 
     gameLoopRef.current = setInterval(() => {
-      setPaceCars(prevPaceCars =>
-        prevPaceCars.map(pc => {
-          let newX = pc.x;
-          let newY = pc.y;
-          let newDirection = pc.direction;
+      if (!isFreezeActive) {
+        setPaceCars(prevPaceCars =>
+          prevPaceCars.map(pc => {
+            let newX = pc.x;
+            let newY = pc.y;
+            let newDirection = pc.direction;
 
-          const dx = playerCar.x - pc.x;
-          const dy = playerCar.y - pc.y;
+            const dx = playerCar.x - pc.x;
+            const dy = playerCar.y - pc.y;
 
-          if (Math.abs(dx) > Math.abs(dy)) {
-            if (dx > 0) { newX += paceCarSpeed; newDirection = 'right'; }
-            else { newX -= paceCarSpeed; newDirection = 'left'; }
-          } else {
-            if (dy > 0) { newY += paceCarSpeed; newDirection = 'down'; }
-            else { newY -= paceCarSpeed; newDirection = 'up'; }
-          }
-
-          newX = Math.max(0, Math.min(TRACK_WIDTH - CAR_WIDTH, newX));
-          newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY));
-
-          const proposedPaceCar = { ...pc, x: newX, y: newY, direction: newDirection };
-
-          for (const obs of obstacles) {
-            if (checkCollision(proposedPaceCar, obs)) {
-              if (obs.isChanceGate && isGateOpen) continue; // Pace cars can also pass open gate
-              if (Math.random() < 0.5) {
-                 proposedPaceCar.x = pc.x;
-              } else {
-                 proposedPaceCar.y = pc.y;
-              }
-              if (Math.random() < 0.2) proposedPaceCar.x += (Math.random() < 0.5 ? -INITIAL_MOVE_STEP/2 : INITIAL_MOVE_STEP/2);
-              break;
+            if (Math.abs(dx) > Math.abs(dy)) {
+              if (dx > 0) { newX += paceCarSpeed; newDirection = 'right'; }
+              else { newX -= paceCarSpeed; newDirection = 'left'; }
+            } else {
+              if (dy > 0) { newY += paceCarSpeed; newDirection = 'down'; }
+              else { newY -= paceCarSpeed; newDirection = 'up'; }
             }
-          }
-          return proposedPaceCar;
-        })
-      );
+
+            newX = Math.max(0, Math.min(TRACK_WIDTH - CAR_WIDTH, newX));
+            newY = Math.max(FINISH_LINE_HEIGHT, Math.min(TRACK_HEIGHT - CAR_HEIGHT, newY));
+
+            const proposedPaceCar = { ...pc, x: newX, y: newY, direction: newDirection };
+
+            for (const obs of obstacles) {
+              if (checkCollision(proposedPaceCar, obs)) {
+                if (obs.isChanceGate && isGateOpen) continue; // Pace cars can also pass open gate
+                if (Math.random() < 0.5) {
+                   proposedPaceCar.x = pc.x;
+                } else {
+                   proposedPaceCar.y = pc.y;
+                }
+                if (Math.random() < 0.2) proposedPaceCar.x += (Math.random() < 0.5 ? -INITIAL_MOVE_STEP/2 : INITIAL_MOVE_STEP/2);
+                break;
+              }
+            }
+            return proposedPaceCar;
+          })
+        );
+      }
 
       for (const pc of paceCars) {
         if (checkCollision(playerCar, pc)) {
@@ -306,7 +310,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame, isGateOpen]);
+  }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame, isGateOpen, isFreezeActive]);
   
   const handleSuperBoost = () => {
     if (!isSuperBoostActive) {
@@ -314,6 +318,16 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       toast({
         title: "Super Boost Activated!",
         description: "1000% speed boost for this level!",
+      });
+    }
+  };
+
+  const handleFreeze = () => {
+    if (!isFreezeActive) {
+      setIsFreezeActive(true);
+      toast({
+        title: "Pace Cars Frozen!",
+        description: "The other cars are frozen for this level!",
       });
     }
   };
@@ -427,15 +441,26 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
               <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowDown')}><ArrowDown size={32} /></Button>
               <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowRight')}><ArrowRight size={32} /></Button>
             </div>
-            <Button
-              onClick={handleSuperBoost}
-              disabled={isSuperBoostActive}
-              variant="destructive"
-              className="mt-4 font-headline text-lg"
-            >
-              <Zap className="mr-2 h-5 w-5" />
-              1000% Speed Boost ($10.99)
-            </Button>
+            <div className="flex gap-4">
+              <Button
+                onClick={handleSuperBoost}
+                disabled={isSuperBoostActive}
+                variant="destructive"
+                className="mt-4 font-headline text-lg"
+              >
+                <Zap className="mr-2 h-5 w-5" />
+                1000% Speed Boost ($10.99)
+              </Button>
+              <Button
+                onClick={handleFreeze}
+                disabled={isFreezeActive}
+                variant="outline"
+                className="mt-4 font-headline text-lg bg-blue-300 hover:bg-blue-400"
+              >
+                <Snowflake className="mr-2 h-5 w-5" />
+                Freeze ($5.99)
+              </Button>
+            </div>
         </div>
       )}
     </div>
