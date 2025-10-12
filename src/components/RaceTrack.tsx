@@ -8,7 +8,7 @@ import { BugattiCar } from '@/components/icons/BugattiCar';
 import { ChevyCar } from '@/components/icons/ChevyCar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Loader2, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -38,6 +38,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const { toast } = useToast();
   const [isSpinning, setIsSpinning] = useState(false);
   const [isGateOpen, setIsGateOpen] = useState(false);
+  const [isSuperBoostActive, setIsSuperBoostActive] = useState(false);
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -101,6 +102,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     
     setIsSpinning(false);
     setIsGateOpen(false);
+    setIsSuperBoostActive(false);
 
     setFinishLine({
       id: 'finish',
@@ -118,7 +120,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     const trackMargin = TRACK_WIDTH * 0.05;
 
     const leftPlacementMaxRandomRange = (TRACK_WIDTH / 2) - obstacleEffectiveWidth - (2 * trackMargin);
-    const rightPlacementMaxRandomRange = (TRACK_WIDTH / 2) + trackMargin + Math.random() * Math.max(0, leftPlacementMaxRandomRange); // FIX: Changed to leftPlacementMaxRandomRange
+    const rightPlacementMaxRandomRange = (TRACK_WIDTH / 2) - obstacleEffectiveWidth - (2 * trackMargin); 
 
     let tunnelX, bridgeX;
 
@@ -163,11 +165,15 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const handlePlayerMove = useCallback((key: string) => {
     if (isGameOver || isSpinning) return;
 
-    let moveStep = INITIAL_MOVE_STEP;
-    if (level >= 10) {
+    let moveStep;
+    if (isSuperBoostActive) {
+      moveStep = INITIAL_MOVE_STEP * 10; // 1000% boost
+    } else if (level >= 10) {
       moveStep = INITIAL_MOVE_STEP * 1.4; // 40% boost
     } else if (level >= 3) {
       moveStep = INITIAL_MOVE_STEP * 1.1; // 10% boost
+    } else {
+      moveStep = INITIAL_MOVE_STEP;
     }
 
     setPlayerCar((prev) => {
@@ -225,7 +231,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       }
       return proposedCar;
     });
-  }, [isGameOver, isSpinning, obstacles, checkCollision, toast, isGateOpen, level]);
+  }, [isGameOver, isSpinning, obstacles, checkCollision, toast, isGateOpen, level, isSuperBoostActive]);
 
 
   useEffect(() => {
@@ -301,6 +307,16 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame, isGateOpen]);
+  
+  const handleSuperBoost = () => {
+    if (!isSuperBoostActive) {
+      setIsSuperBoostActive(true);
+      toast({
+        title: "Super Boost Activated!",
+        description: "1000% speed boost for this level!",
+      });
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-4">
@@ -393,7 +409,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
             <p className="text-3xl font-headline text-white">Final Score: {score}</p>
             <p className="text-2xl font-headline text-white">Reached Level: {level}</p>
 
-            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6 !mt-6"> {/* Added !mt-6 for spacing */}
+            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6 !mt-6">
               <RotateCcw className="mr-2 h-5 w-5" />
               Play Again
             </Button>
@@ -402,17 +418,27 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       </div>
 
       {!isGameOver && (
-        <div className="mt-8 grid grid-cols-3 gap-2 w-48">
-          <div></div>
-          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowUp')}><ArrowUp size={32} /></Button>
-          <div></div>
-          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowLeft')}><ArrowLeft size={32} /></Button>
-          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowDown')}><ArrowDown size={32} /></Button>
-          <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowRight')}><ArrowRight size={32} /></Button>
+        <div className="mt-8 flex flex-col items-center gap-4">
+            <div className="grid grid-cols-3 gap-2 w-48">
+              <div></div>
+              <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowUp')}><ArrowUp size={32} /></Button>
+              <div></div>
+              <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowLeft')}><ArrowLeft size={32} /></Button>
+              <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowDown')}><ArrowDown size={32} /></Button>
+              <Button variant="outline" size="icon" className="p-4 active:bg-accent" onClick={() => handlePlayerMove('ArrowRight')}><ArrowRight size={32} /></Button>
+            </div>
+            <Button
+              onClick={handleSuperBoost}
+              disabled={isSuperBoostActive}
+              variant="destructive"
+              className="mt-4 font-headline text-lg"
+            >
+              <Zap className="mr-2 h-5 w-5" />
+              1000% Speed Boost ($10.99)
+            </Button>
         </div>
       )}
     </div>
   );
 }
-
-    
+ 
