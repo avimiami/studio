@@ -169,7 +169,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
     let moveStep;
     if (isSuperBoostActive) {
-      moveStep = INITIAL_MOVE_STEP * 10; // 1000% boost
+      moveStep = INITIAL_MOVE_STEP * 3; // 200% boost
     } else if (level >= 10) {
       moveStep = INITIAL_MOVE_STEP * 1.4; // 40% boost
     } else if (level >= 3) {
@@ -317,7 +317,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       setIsSuperBoostActive(true);
       toast({
         title: "Super Boost Activated!",
-        description: "1000% speed boost for this level!",
+        description: "200% speed boost for this level!",
       });
     }
   };
@@ -449,7 +449,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
                 className="mt-4 font-headline text-lg"
               >
                 <Zap className="mr-2 h-5 w-5" />
-                1000% Speed Boost ($10.99)
+                200% Speed Boost ($10.99)
               </Button>
               <Button
                 onClick={handleFreeze}
@@ -466,4 +466,3 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     </div>
   );
 }
- 
