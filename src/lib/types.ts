@@ -8,6 +8,14 @@ export const CAR_COLORS: Record<CarColor, string> = {
   red: '#FF0000', // Red
 };
 
+export type CarModel = 'bugatti' | 'muscle' | 'cyberpunk';
+
+export const CAR_MODELS: Record<CarModel, string> = {
+  bugatti: 'Bugatti',
+  muscle: 'Muscle Car',
+  cyberpunk: 'Cyberpunk',
+};
+
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
 export interface GameObject {
@@ -21,5 +29,14 @@ export interface GameObject {
   isObstacle?: boolean;
   isFinishLine?: boolean;
   isChanceGate?: boolean;
+  isTunnel?: boolean; // Passable - car can drive through
+  isBridge?: boolean; // Passable - car drives over
   label?: string; // For displaying text on obstacles/finish line
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  name: string;
+  score: number;
+  timestamp?: unknown;
 }

@@ -2,18 +2,24 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { CarColor, Direction, GameObject } from '@/lib/types';
+import type { CarColor, CarModel, Direction, GameObject } from '@/lib/types';
 import { CAR_COLORS } from '@/lib/types';
 import { BugattiCar } from '@/components/icons/BugattiCar';
 import { ChevyCar } from '@/components/icons/ChevyCar';
+import { MuscleCar } from '@/components/icons/MuscleCar';
+import { CyberpunkCar } from '@/components/icons/CyberpunkCar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
+import { LeaderboardDisplay } from '@/components/LeaderboardDisplay';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, Flag, Loader2, Zap, Snowflake } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getLeaderboardScores } from '@/app/actions/leaderboardActions';
+import type { LeaderboardEntry } from '@/lib/types';
 
 
 interface RaceTrackProps {
   playerCarColorName: CarColor;
+  playerCarModel?: CarModel;
 }
 
 const TRACK_WIDTH = 800;
@@ -29,8 +35,21 @@ const FINISH_LINE_HEIGHT = 40;
 const ROADBLOCK_WIDTH = TRACK_WIDTH * 0.4;
 const ROADBLOCK_HEIGHT = 30;
 
-export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
+export function RaceTrack({ playerCarColorName, playerCarModel = 'bugatti' }: RaceTrackProps) {
   const playerCarColor = CAR_COLORS[playerCarColorName];
+
+  const renderPlayerCar = () => {
+    switch (playerCarModel) {
+      case 'bugatti':
+        return <BugattiCar color={playerCar.color} direction={playerCar.direction} className="w-full h-full" />;
+      case 'muscle':
+        return <MuscleCar color={playerCar.color} direction={playerCar.direction} stripeColor="#ffffff" className="w-full h-full" />;
+      case 'cyberpunk':
+        return <CyberpunkCar color={playerCar.color} direction={playerCar.direction} glowColor="#00ffff" className="w-full h-full" />;
+      default:
+        return <BugattiCar color={playerCar.color} direction={playerCar.direction} className="w-full h-full" />;
+    }
+  };
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [paceCarSpeed, setPaceCarSpeed] = useState(INITIAL_PACE_CAR_SPEED);
@@ -40,6 +59,11 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
   const [isGateOpen, setIsGateOpen] = useState(false);
   const [isSuperBoostActive, setIsSuperBoostActive] = useState(false);
   const [isFreezeActive, setIsFreezeActive] = useState(false);
+  const [isInTunnel, setIsInTunnel] = useState(false);
+  const [isOnBridge, setIsOnBridge] = useState(false);
+  const [tunnelInvincibility, setTunnelInvincibility] = useState(false);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -105,6 +129,9 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     setIsGateOpen(false);
     setIsSuperBoostActive(false);
     setIsFreezeActive(false);
+    setIsInTunnel(false);
+    setIsOnBridge(false);
+    setTunnelInvincibility(false);
 
     setFinishLine({
       id: 'finish',
@@ -142,8 +169,8 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     const actualBridgeWidth = TRACK_WIDTH * 0.35;
 
     setObstacles([
-      { id: 'tunnel', x: tunnelX, y: TRACK_HEIGHT * 0.20, width: actualTunnelWidth, height: 60, color: 'hsl(var(--muted))', isObstacle: true, label: 'Tunnel', direction: 'up' as Direction },
-      { id: 'bridge', x: bridgeX, y: TRACK_HEIGHT * 0.45, width: actualBridgeWidth, height: 50, color: 'hsl(var(--secondary))', isObstacle: true, label: 'Bridge', direction: 'up' as Direction},
+      { id: 'tunnel', x: tunnelX, y: TRACK_HEIGHT * 0.20, width: actualTunnelWidth, height: 60, color: '#4a5568', isTunnel: true, label: 'Tunnel', direction: 'up' as Direction },
+      { id: 'bridge', x: bridgeX, y: TRACK_HEIGHT * 0.45, width: actualBridgeWidth, height: 50, color: '#8B4513', isBridge: true, label: 'Bridge', direction: 'up' as Direction},
       { id: 'spinnerGate', x: TRACK_WIDTH / 2 - ROADBLOCK_WIDTH / 2, y: TRACK_HEIGHT * 0.70, width: ROADBLOCK_WIDTH, height: ROADBLOCK_HEIGHT, color: 'hsl(var(--accent))', isObstacle: true, isChanceGate: true, label: 'Spinner Gate', direction: 'up' as Direction},
       { id: 'wall-left', x: 0, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
       { id: 'wall-right', x: TRACK_WIDTH * 0.85, y: TRACK_HEIGHT * 0.30, width: TRACK_WIDTH * 0.15, height: 40, color: 'hsl(var(--border))', isObstacle: true, label: '', direction: 'up' as Direction},
@@ -170,6 +197,8 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
     let moveStep;
     if (isSuperBoostActive) {
       moveStep = INITIAL_MOVE_STEP * 3; // 200% boost
+    } else if (isOnBridge) {
+      moveStep = INITIAL_MOVE_STEP * 2; // 100% boost on bridge
     } else if (level >= 10) {
       moveStep = INITIAL_MOVE_STEP * 1.4; // 40% boost
     } else if (level >= 3) {
@@ -206,8 +235,19 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
       const proposedCar = { ...prev, x: newX, y: newY, direction: newDirection };
 
+      let enteringTunnel = false;
+      let enteringBridge = false;
+      
       for (const obs of obstacles) {
         if (checkCollision(proposedCar, obs)) {
+          if (obs.isTunnel) {
+            enteringTunnel = true;
+            continue; // Allow movement through tunnel
+          }
+          if (obs.isBridge) {
+            enteringBridge = true;
+            continue; // Allow movement over bridge
+          }
           if (obs.isChanceGate) {
             if (isGateOpen) {
               continue; // Gate is open, allow movement
@@ -231,9 +271,61 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
           return prev;
         }
       }
+      
+      // Update tunnel/bridge state
+      if (enteringTunnel !== isInTunnel) {
+        setIsInTunnel(enteringTunnel);
+        if (enteringTunnel) {
+          setTunnelInvincibility(true);
+          toast({ 
+            title: "Entered Tunnel!", 
+            description: "You're hidden from pace cars temporarily!",
+            duration: 2000
+          });
+          // Invincibility lasts for 3 seconds after exiting tunnel
+          setTimeout(() => {
+            setTunnelInvincibility(false);
+          }, 3000);
+        }
+      }
+      
+      if (enteringBridge !== isOnBridge) {
+        setIsOnBridge(enteringBridge);
+        if (enteringBridge) {
+          toast({ 
+            title: "On Bridge!", 
+            description: "Speed boost activated!",
+            duration: 2000
+          });
+        }
+      }
+      
       return proposedCar;
     });
-  }, [isGameOver, isSpinning, obstacles, checkCollision, toast, isGateOpen, level, isSuperBoostActive]);
+  }, [isGameOver, isSpinning, obstacles, checkCollision, toast, isGateOpen, level, isSuperBoostActive, isInTunnel, isOnBridge]);
+
+  // Check if player is still in tunnel/bridge (for cases where they move fast and skip collision detection)
+  useEffect(() => {
+    if (isGameOver) return;
+    
+    const checkStillInSpecialZone = () => {
+      let inTunnel = false;
+      let onBridge = false;
+      
+      for (const obs of obstacles) {
+        if (checkCollision(playerCar, obs)) {
+          if (obs.isTunnel) inTunnel = true;
+          if (obs.isBridge) onBridge = true;
+        }
+      }
+      
+      if (inTunnel !== isInTunnel) setIsInTunnel(inTunnel);
+      if (onBridge !== isOnBridge) setIsOnBridge(onBridge);
+    };
+    
+    const interval = setInterval(checkStillInSpecialZone, 100);
+    return () => clearInterval(interval);
+  }, [playerCar, obstacles, isGameOver, checkCollision, isInTunnel, isOnBridge]);
 
 
   useEffect(() => {
@@ -295,6 +387,10 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
 
       for (const pc of paceCars) {
         if (checkCollision(playerCar, pc)) {
+          // If player is in tunnel or has tunnel invincibility, they don't collide
+          if (isInTunnel || tunnelInvincibility) {
+            continue;
+          }
           setIsGameOver(true);
           break;
         }
@@ -310,7 +406,7 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame, isGateOpen, isFreezeActive]);
+  }, [playerCar, paceCars, obstacles, finishLine, checkCollision, isGameOver, paceCarSpeed, resetGame, isGateOpen, isFreezeActive, isInTunnel, tunnelInvincibility]);
   
   const handleSuperBoost = () => {
     if (!isSuperBoostActive) {
@@ -372,18 +468,21 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
               width: obs.width,
               height: obs.height,
               backgroundColor: obs.color,
-              border: '2px solid hsl(var(--border))',
-              boxShadow: '2px 2px 5px rgba(0,0,0,0.2)',
+              border: obs.isTunnel ? '4px solid #2d3748' : obs.isBridge ? '4px solid #654321' : '2px solid hsl(var(--border))',
+              boxShadow: obs.isTunnel ? 'inset 0 4px 8px rgba(0,0,0,0.5)' : obs.isBridge ? '0 8px 16px rgba(0,0,0,0.3)' : '2px 2px 5px rgba(0,0,0,0.2)',
               opacity: (obs.isChanceGate && isGateOpen) ? 0.4 : 1,
               transition: 'opacity 0.3s ease-in-out',
+              zIndex: obs.isBridge ? 1 : obs.isTunnel ? 0 : 2,
             }}
-             className="flex items-center justify-center rounded"
+             className={`flex items-center justify-center ${obs.isTunnel ? 'rounded-lg' : obs.isBridge ? 'rounded-sm' : 'rounded'}`}
           >
             {obs.isChanceGate && isSpinning && (
               <Loader2 className="h-8 w-8 animate-spin text-white" />
             )}
             {!isSpinning && (
-              <span className="font-body text-sm text-foreground/80">{obs.label}</span>
+              <span className={`font-body text-sm ${obs.isTunnel ? 'text-gray-300 font-bold' : obs.isBridge ? 'text-amber-100 font-bold' : 'text-foreground/80'}`}>
+                {obs.isTunnel ? '🚇 TUNNEL' : obs.isBridge ? '🌉 BRIDGE' : obs.label}
+              </span>
             )}
           </div>
         ))}
@@ -395,10 +494,29 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
             top: playerCar.y,
             width: playerCar.width,
             height: playerCar.height,
-            transition: 'left 0.05s linear, top 0.05s linear',
+            transition: 'left 0.05s linear, top 0.05s linear, opacity 0.2s ease-in-out, transform 0.2s ease-in-out',
+            opacity: isInTunnel ? 0.4 : 1,
+            transform: isOnBridge ? 'scale(0.9)' : 'scale(1)',
+            zIndex: isOnBridge ? 10 : 5,
+            filter: tunnelInvincibility ? 'drop-shadow(0 0 8px rgba(41, 171, 226, 0.8))' : 'none',
           }}
         >
-          <BugattiCar color={playerCar.color} direction={playerCar.direction} className="w-full h-full" />
+          {renderPlayerCar()}
+          {isInTunnel && (
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-blue-400 whitespace-nowrap">
+              HIDDEN
+            </div>
+          )}
+          {isOnBridge && (
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-amber-600 whitespace-nowrap">
+              BOOST!
+            </div>
+          )}
+          {tunnelInvincibility && !isInTunnel && (
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-cyan-400 whitespace-nowrap animate-pulse">
+              INVINCIBLE
+            </div>
+          )}
         </div>
 
         {paceCars.map((pc) => (
@@ -417,16 +535,52 @@ export function RaceTrack({ playerCarColorName }: RaceTrackProps) {
           </div>
         ))}
 
-        {isGameOver && (
+        {isGameOver && !showLeaderboard && (
           <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 p-4 space-y-4">
             <h2 className="text-5xl font-headline text-destructive">Game Over!</h2>
             <p className="text-3xl font-headline text-white">Final Score: {score}</p>
             <p className="text-2xl font-headline text-white">Reached Level: {level}</p>
 
-            <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6 !mt-6">
-              <RotateCcw className="mr-2 h-5 w-5" />
-              Play Again
-            </Button>
+            <div className="flex gap-4 !mt-6">
+              <Button onClick={() => resetGame(false)} size="lg" className="font-headline text-xl py-3 px-6">
+                <RotateCcw className="mr-2 h-5 w-5" />
+                Play Again
+              </Button>
+              <Button 
+                onClick={async () => {
+                  try {
+                    const scores = await getLeaderboardScores();
+                    setLeaderboardEntries(scores);
+                    setShowLeaderboard(true);
+                  } catch (error) {
+                    console.error('Failed to fetch leaderboard:', error);
+                  }
+                }} 
+                size="lg" 
+                variant="outline"
+                className="font-headline text-xl py-3 px-6"
+              >
+                View Leaderboard
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isGameOver && showLeaderboard && (
+          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-30 p-4">
+            <LeaderboardDisplay entries={leaderboardEntries} />
+            <div className="flex gap-4 mt-6">
+              <Button onClick={() => setShowLeaderboard(false)} variant="outline" size="lg">
+                Back to Results
+              </Button>
+              <Button onClick={() => {
+                setShowLeaderboard(false);
+                resetGame(false);
+              }} size="lg">
+                <RotateCcw className="mr-2 h-5 w-5" />
+                Play Again
+              </Button>
+            </div>
           </div>
         )}
       </div>

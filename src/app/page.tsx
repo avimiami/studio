@@ -1,18 +1,37 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CarSelector } from '@/components/CarSelector';
+import { LeaderboardDisplay } from '@/components/LeaderboardDisplay';
 import { Button } from '@/components/ui/button';
-import type { CarColor } from '@/lib/types';
+import type { CarColor, CarModel, LeaderboardEntry } from '@/lib/types';
 import { ArrowRight } from 'lucide-react';
+import { getLeaderboardScores } from '@/app/actions/leaderboardActions';
 
 export default function HomePage() {
   const [selectedColor, setSelectedColor] = useState<CarColor>('blue');
+  const [selectedModel, setSelectedModel] = useState<CarModel>('bugatti');
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
   const router = useRouter();
 
+  useEffect(() => {
+    async function fetchLeaderboard() {
+      try {
+        const scores = await getLeaderboardScores();
+        setLeaderboardEntries(scores);
+      } catch (error) {
+        console.error('Failed to fetch leaderboard:', error);
+      } finally {
+        setIsLoadingLeaderboard(false);
+      }
+    }
+    fetchLeaderboard();
+  }, []);
+
   const handleStartRace = () => {
-    router.push(`/race?color=${selectedColor}`);
+    router.push(`/race?color=${selectedColor}&model=${selectedModel}`);
   };
 
   return (
@@ -22,7 +41,12 @@ export default function HomePage() {
         <p className="mt-2 text-xl text-foreground/80 font-body">Select your car and hit the track!</p>
       </header>
       
-      <CarSelector selectedColor={selectedColor} onColorSelect={setSelectedColor} />
+      <CarSelector 
+        selectedColor={selectedColor} 
+        selectedModel={selectedModel}
+        onColorSelect={setSelectedColor} 
+        onModelSelect={setSelectedModel}
+      />
 
       <Button
         onClick={handleStartRace}
@@ -32,6 +56,10 @@ export default function HomePage() {
         Start Race
         <ArrowRight className="ml-3 h-7 w-7" />
       </Button>
+
+      {!isLoadingLeaderboard && (
+        <LeaderboardDisplay entries={leaderboardEntries} />
+      )}
     </main>
   );
 }
